@@ -1,0 +1,33 @@
+module: Counter:
+		WIDTH = 4
+		SHIFTER = 0
+	port:
+		clk: in
+
+		set: in
+		data: in[WIDTH]
+
+		enable: in
+
+		cnt: out[WIDTH]
+		last: out
+		overflow: out
+
+	if: WIDTH == 0
+		last = 1
+		overflow = enable
+	else:
+		if: SHIFTER
+			last = cnt[-1]
+		else:
+			last = cnt == 0
+		overflow = last & enable
+
+	ff: +clk
+		if: set | overflow
+			cnt = data
+		elif: enable
+			if: SHIFTER
+				cnt = cnt << 1
+			else:
+				cnt = cnt - 1

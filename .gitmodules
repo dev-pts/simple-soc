@@ -1,0 +1,9 @@
+[submodule "tools/list-o-pad"]
+	path = tools/list-o-pad
+	url = https://github.com/dev-pts/list-o-pad
+[submodule "tools/lop-hdl"]
+	path = tools/lop-hdl
+	url = https://github.com/dev-pts/lop-hdl
+[submodule "tools/veri-test"]
+	path = tools/veri-test
+	url = https://github.com/dev-pts/veri-test

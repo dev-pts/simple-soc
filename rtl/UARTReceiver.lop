@@ -1,0 +1,61 @@
+interface: IUARTReceiver
+	port: Master / Slave
+		data: net[8]: out / in
+		valid: net: out / in
+		break_cond: net: out / in
+
+module: UARTReceiver:
+		UART_CLK_DIV = $int(96_000_000 / 921_600)
+	port:
+		clk: in
+		reset: in
+
+		uart_in: in
+
+		intf: IUARTReceiver.Master
+	submodule:
+		uart_clk: Counter(WIDTH = $clog2(UART_CLK_DIV))
+		sr: ShiftRegister(IN_WIDTH = 1, RATIO = 9, REVERSE = 1)
+		uart_syncer: ClkClk(RESET = -1)
+	local:
+		uart_in_synced: net = uart_syncer.odata
+		reset_cond: net = reset | intf.break_cond
+		frame_done: net = sr.i_valid & ~sr.o_data[0]
+
+		prev_uart_in_synced: net
+		incoming: net
+
+	uart_syncer.clk = clk
+	uart_syncer.nreset = ~reset
+	uart_syncer.idata = uart_in
+
+	uart_clk.clk = clk
+	uart_clk.set = prev_uart_in_synced ^ uart_in_synced
+	uart_clk.data = UART_CLK_DIV - 1
+	uart_clk.enable = 1
+
+	sr.clk = clk
+	sr.r_set = reset_cond | intf.valid
+	sr.r_data = -1
+	sr.i_data = prev_uart_in_synced
+	sr.i_valid = incoming && uart_clk.cnt == $int(UART_CLK_DIV / 2)
+
+	ff: +clk
+		if: uart_in_synced
+			intf.break_cond = 0
+		else:
+			if: frame_done
+				intf.break_cond = 1
+			incoming = 1
+
+		if: reset_cond | (intf.valid & uart_in_synced)
+			incoming = 0
+
+		prev_uart_in_synced = uart_in_synced
+
+	intf.data = sr.o_data[1 +.. 8]
+
+	intf.valid = 0
+
+	if: frame_done
+		intf.valid = prev_uart_in_synced

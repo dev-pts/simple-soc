@@ -1,0 +1,32 @@
+module: SimpleSRAM:
+		WBYTES = 4
+		HEIGHT = 512
+		INIT_FILE = ""
+		WORD = 8
+		ALIGN_HEIGHT_UP = (1 << 9) - 1
+	const:
+		WIDTH = WBYTES * WORD
+		HEIGHT_ALIGNED = (HEIGHT + ALIGN_HEIGHT_UP) & ~ALIGN_HEIGHT_UP
+	port:
+		clk: in
+
+		addr: in[$clog2(HEIGHT)]
+
+		wen: in
+		wdata: in[WIDTH]
+		wstrb: in[WBYTES]
+
+		rdata: out[WIDTH]
+	local:
+		ram[HEIGHT_ALIGNED]: net[WIDTH]
+	initial:
+		if: INIT_FILE != ""
+			$readmemh(INIT_FILE, ram)
+
+	ff: +clk
+		rdata = ram[addr]
+
+		if: wen
+			for: j
+				if: wstrb[j]
+					ram[addr][j * WORD +.. WORD] = wdata[j * WORD +.. WORD]

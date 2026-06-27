@@ -1,0 +1,46 @@
+interface: IBootloader
+	port: Master / Slave
+		reset: net: out / in
+
+		addr: net[32]: out / in
+		wdata: net[32]: out / in
+		wen: net: out / in
+
+module: UARTBootloader
+	port:
+		clk: in
+		reset: in
+
+		ur: IUARTReceiver.Slave
+
+		cmd: IBootloader.Master
+	submodule:
+		sr: ShiftRegister(IN_WIDTH = 8, RATIO = 4)
+		cnt: ShiftRegister(IN_WIDTH = 1, RATIO = 5)
+
+	sr.clk = clk
+	sr.r_set = 0
+	sr.r_data = 0
+	sr.i_data = ur.data
+	sr.i_valid = ur.valid
+
+	cnt.clk = clk
+	cnt.r_set = ur.break_cond
+	cnt.r_data = 1
+	cnt.i_data = cnt.o_data[-1]
+	cnt.i_valid = ur.valid
+
+	cmd.wdata = sr.o_data
+	cmd.wen = (cnt.o_data[-1] & ur.valid) && ur.data == 0x01
+
+	ff: +clk
+		if: cnt.o_data[-1] & ur.valid
+			if: ur.data == 0x00
+				cmd.reset = sr.o_data[0]
+
+		if: cmd.wen
+			cmd.addr = cmd.addr + 1
+
+		if: reset | ur.break_cond
+			cmd.reset = 1
+			cmd.addr = 0

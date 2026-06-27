@@ -1,0 +1,39 @@
+module: UARTTransmitter:
+		UART_CLK_DIV = $int(96_000_000 / 921_600)
+	port:
+		clk: in
+		reset: in
+
+		uart_out: out
+		uart_sending: out
+
+		data: in[8]
+		valid: in
+	submodule:
+		uart_clk: Counter(WIDTH = $clog2(UART_CLK_DIV))
+		sr: ShiftRegister(IN_WIDTH = 1, RATIO = 10, REVERSE = 1)
+	local:
+		outgoing: net
+
+	uart_clk.clk = clk
+	uart_clk.set = valid
+	uart_clk.data = UART_CLK_DIV - 1
+	uart_clk.enable = outgoing
+
+	sr.clk = clk
+	sr.r_set = reset | valid
+	sr.r_data = { data, 1b0, 1b1 }
+	sr.i_data = 1
+	sr.i_valid = uart_clk.overflow
+
+	uart_out = sr.o_data[0]
+	uart_sending = outgoing
+
+	ff: +clk
+		if: valid
+			$write("%c", data)
+			$fflush()
+		if: reset | &sr.o_data
+			outgoing = 0
+		if: valid
+			outgoing = 1

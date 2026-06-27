@@ -1,0 +1,19 @@
+module: ClkClk:
+		WIDTH = 1
+		HEIGHT = 2
+		RESET = 0
+	port:
+		clk: in
+		nreset: in
+		idata: in[WIDTH]
+		odata: out[WIDTH]
+	local:
+		sync: net[WIDTH * HEIGHT]
+
+	odata = sync
+
+	ff: +clk, -nreset
+		if: ~nreset
+			sync = RESET
+		else:
+			sync = { idata, sync[-1 .. WIDTH] }

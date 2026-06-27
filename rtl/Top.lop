@@ -1,0 +1,58 @@
+module: Top
+	port:
+		clk: in
+		reset: in
+
+		uart_in: in
+		uart_out: out
+	submodule:
+		cpu: CPU
+		sram: SimpleSRAM(HEIGHT = 2048)
+		ur: UARTReceiver(UART_CLK_DIV = 50_000_000 / 2_000_000)
+		ut: UARTTransmitter(UART_CLK_DIV = 50_000_000 / 2_000_000)
+		ub: UARTBootloader
+	local:
+		rbusy: net
+
+	ub.clk = clk
+	ub.reset = reset
+
+	$connect(ub.ur, ur.intf)
+
+	ur.clk = clk
+	ur.reset = reset
+	ur.uart_in = uart_in
+
+	ut.clk = clk
+	ut.reset = ub.cmd.reset
+	ut.data = cpu.mem_wdata
+	ut.valid = |cpu.mem_wmask & cpu.mem_addr[-1] & ~ut.uart_sending
+
+	uart_out = ut.uart_out
+
+	sram.clk = clk
+	if: ub.cmd.wen
+		sram.addr = ub.cmd.addr
+		sram.wen = ub.cmd.wen
+		sram.wdata = ub.cmd.wdata
+		sram.wstrb = -1
+	else:
+		sram.addr = cpu.mem_addr[-1 .. 2]
+		sram.wen = |cpu.mem_wmask & ~cpu.mem_addr[-1]
+		sram.wdata = cpu.mem_wdata
+		sram.wstrb = cpu.mem_wmask
+
+	cpu.clk = clk
+	cpu.reset = ub.cmd.reset
+
+	cpu.mem_rdata = sram.rdata
+	cpu.mem_rbusy = cpu.mem_rstrb | rbusy
+	cpu.mem_rbusy = 0
+	cpu.mem_wbusy = 0
+
+	ff: +clk
+		if: cpu.mem_rstrb
+			rbusy = 1
+
+		if: ub.cmd.reset
+			rbusy = 0

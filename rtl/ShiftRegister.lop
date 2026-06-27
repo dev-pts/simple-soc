@@ -1,0 +1,28 @@
+module: ShiftRegister:
+		IN_WIDTH = 4
+		RATIO = 2
+		REVERSE = 0
+	const:
+		OUT_WIDTH = IN_WIDTH * RATIO
+	port:
+		clk: in
+
+		r_data: in[OUT_WIDTH]
+		r_set: in
+
+		i_data: in[IN_WIDTH]
+		i_valid: in
+
+		o_data: out[OUT_WIDTH]
+		o_data_next: out[OUT_WIDTH]
+
+	if: REVERSE
+		o_data_next = { i_data, o_data[-1 .. IN_WIDTH] }
+	else:
+		o_data_next = { o_data, i_data }
+
+	ff: +clk
+		if: r_set
+			o_data = r_data
+		elif: i_valid
+			o_data = o_data_next
