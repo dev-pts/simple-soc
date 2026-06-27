@@ -1,0 +1,11 @@
+# Don't forget to set dual pin option
+IO_LOC "clk" E2;
+IO_PORT "clk" PULL_MODE=NONE BANK_VCCIO=3.3;
+
+IO_LOC "reset" H11;
+IO_PORT "reset" PULL_MODE=DOWN BANK_VCCIO=3.3;
+
+IO_LOC "uart_in" B3;
+IO_PORT "uart_in" PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "uart_out" C3;
+IO_PORT "uart_out" PULL_MODE=UP DRIVE=2 BANK_VCCIO=3.3;
