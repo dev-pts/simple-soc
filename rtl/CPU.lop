@@ -10,8 +10,7 @@ module: CPU:
 		mem_wdata: out[32]
 		mem_wmask: out[4]
 		mem_rstrb: out
-		mem_rbusy: in
-		mem_wbusy: in
+		mem_busy: in
 	local:
 		rdId: net[5] = instr[11 .. 7]
 
@@ -144,6 +143,9 @@ module: CPU:
 
 	mem_rstrb = state.EXECUTE & isLoad | state.FETCH_INSTR
 	mem_wmask = 4{ state.EXECUTE & isStore } & STORE_wmask
+	if: reset
+		mem_rstrb = 0
+		mem_wmask = 0
 
 	aluWr = state.EXECUTE & isALU
 
@@ -169,13 +171,14 @@ module: CPU:
 
 	ff: +clk
 		if: reset
-			$goto(state.WAIT_ALU_OR_MEM)
+			$goto(state.FETCH_INSTR)
 			PC = RESET_ADDR
 		else:
-			$goto(state.WAIT_INSTR)
+			if: state.FETCH_INSTR
+				$goto(state.WAIT_INSTR)
 
 			if: state.WAIT_INSTR
-				if: !mem_rbusy
+				if: !mem_busy
 					rs1 = regFile[mem_rdata[19 .. 15]]
 					rs2 = regFile[mem_rdata[24 .. 20]]
 					instr = mem_rdata
@@ -194,7 +197,7 @@ module: CPU:
 					$goto(state.FETCH_INSTR)
 
 			if: state.WAIT_ALU_OR_MEM
-				if: !aluBusy & !mem_rbusy & !mem_wbusy
+				if: !aluBusy & !mem_busy
 					$goto(state.FETCH_INSTR)
 
 	ff: +clk

@@ -11,8 +11,6 @@ module: Top
 		ur: UARTReceiver(UART_CLK_DIV = 50_000_000 / 2_000_000)
 		ut: UARTTransmitter(UART_CLK_DIV = 50_000_000 / 2_000_000)
 		ub: UARTBootloader
-	local:
-		rbusy: net
 
 	ub.clk = clk
 	ub.reset = reset
@@ -46,13 +44,4 @@ module: Top
 	cpu.reset = ub.cmd.reset
 
 	cpu.mem_rdata = sram.rdata
-	cpu.mem_rbusy = cpu.mem_rstrb | rbusy
-	cpu.mem_rbusy = 0
-	cpu.mem_wbusy = 0
-
-	ff: +clk
-		if: cpu.mem_rstrb
-			rbusy = 1
-
-		if: ub.cmd.reset
-			rbusy = 0
+	cpu.mem_busy = 0
