@@ -12,13 +12,23 @@ module: CPU:
 		mem_rstrb: out
 		mem_busy: in
 	local:
+		rs1: net[32]
+		rs2: net[32]
+		regFile[32]: net[32]
+
+		instr: net[32]
+
+		PC: net[32]
+		PCplus4: net[32] = PC + 4
+		PCplusImm: net[32] = PC + mux(isJAL, Jimm, mux(isAUIPC, Uimm, Bimm))
+		PCnext: net[32] = \
+			mux(isJALR, { aluPlus[31 .. 1], 1b0 },
+				mux(jumpToPCplusImm, PCplusImm,
+					PCplus4))
+
 		rdId: net[5] = instr[11 .. 7]
 
 		\\funct3Is: net[8] = 1 << instr[14 .. 12]
-		\\ FIXME? for: i, funct3Is[i] = instr[14 .. 12] == i
-		\\ FIXME? for: i, funct3Is[i] = &(~(instr[14 .. 12] ^ i))
-		\\ FIXME! for: i, funct3Is[i] = &(instr[14 .. 12] ^ (~i))
-		\\ Without & 7 synthesis timing becomes 40% worse
 		funct3Is: net[8] = for(i < 8, &(instr[14 .. 12] ^ $number(i, 3, 'd')))
 
 		Uimm: net[32] = { instr[31], instr[30 .. 12], 12b0 }
@@ -77,15 +87,6 @@ module: CPU:
 			funct3Is[6] & LTU | \
 			funct3Is[7] & !LTU
 
-		rs1: net[32]
-		rs2: net[32]
-		regFile[32]: net[32]
-
-		PC: net[32]
-		instr: net[32]
-
-		PCplus4: net[32] = PC + 4
-		PCplusImm: net[32] = PC + mux(isJAL, Jimm, mux(isAUIPC, Uimm, Bimm))
 		loadstore_addr: net[32] = rs1 + mux(isStore, Simm, Iimm)
 
 		writeBackData: net[32] = \
@@ -102,14 +103,11 @@ module: CPU:
 		LOAD_sign: net = ~instr[14] & mux(mem_byteAccess, LOAD_byte[7], LOAD_halfword[15])
 
 		LOAD_data: net[32] = \
-			mux(mem_byteAccess,
-				{ 24{ LOAD_sign }, LOAD_byte },
-				mux(mem_halfwordAccess,
-					{ 16{ LOAD_sign }, LOAD_halfword },
+			mux(mem_byteAccess, { 24{ LOAD_sign }, LOAD_byte },
+				mux(mem_halfwordAccess, { 16{ LOAD_sign }, LOAD_halfword },
 					mem_rdata))
 
 		LOAD_halfword: net[16] = mux(loadstore_addr[1], mem_rdata[31 .. 16], mem_rdata[15 .. 0])
-
 		LOAD_byte: net[8] = mux(loadstore_addr[0], LOAD_halfword[15 .. 8], LOAD_halfword[7 .. 0])
 
 		STORE_wmask: net[4] = \
@@ -141,7 +139,7 @@ module: CPU:
 	mem_wdata[23 .. 16] = mux(loadstore_addr[1], rs2[7 .. 0], rs2[23 .. 16])
 	mem_wdata[31 .. 24] = mux(loadstore_addr[0], rs2[7 .. 0], mux(loadstore_addr[1], rs2[15 .. 8], rs2[31 .. 24]))
 
-	mem_rstrb = state.EXECUTE & isLoad | state.FETCH_INSTR
+	mem_rstrb = (state.EXECUTE & isLoad) | state.FETCH_INSTR
 	mem_wmask = 4{ state.EXECUTE & isStore } & STORE_wmask
 	if: reset
 		mem_rstrb = 0
@@ -185,12 +183,7 @@ module: CPU:
 					$goto(state.EXECUTE)
 
 			if: state.EXECUTE
-				PC = \
-					mux(isJALR,
-						{ aluPlus[31 .. 1], 1b0 },
-						mux(jumpToPCplusImm,
-							PCplusImm,
-							PCplus4))
+				PC = PCnext
 				if: needToWait
 					$goto(state.WAIT_ALU_OR_MEM)
 				else:
