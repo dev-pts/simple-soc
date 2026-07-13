@@ -44,14 +44,15 @@ run() {
 		LOP_HDL="python3 ../tools/lop-hdl/main.py" \
 		GEN_TB_H="sh $(pwd)/../tools/veri-test/gen-tb-h.sh" \
 		VERI_TEST=$(pwd)/../tools/veri-test/VeriTest.py \
-		TOP=Top
+		TOP=$2
 
 	make run \
 		VERI_TEST=$(pwd)/../tools/veri-test/VeriTest.py \
 		CROSS_COMPILE=${HOME}/opt/cross/bin/riscv-elf- \
-		TOP=Top
+		TEST=$1 \
+		TOP=$2
 
 	cd -
 }
 
-$1
+$1 $2 $3

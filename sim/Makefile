@@ -11,7 +11,7 @@ tb: $(TB_CPP) TopSim.v
 		$^
 
 run: a.bin
-	PYTHONPATH=$(dir $(VERI_TEST)) python3 test.py obj_dir/V$(TOP)
+	PYTHONPATH=$(dir $(VERI_TEST)) python3 $(TEST) obj_dir/V$(TOP)
 
 a.bin: a.c
 	sh build.sh build
@@ -22,7 +22,7 @@ TopSim.v: king.lop
 
 clean:
 	rm -fr obj_dir/
-	rm -fr tb-cond.h tb-sig.h tb-top.h
+	rm -f tb-sig.h tb-top.h tb.py
 	rm -f TopSim.v
 	rm -f king.lop
 	rm -f simx.vcd
