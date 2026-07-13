@@ -21,6 +21,7 @@ TopSim.v: king.lop
 	$(GEN_TB_H) $(TOP) $^
 
 clean:
+	rm -fr __pycache__
 	rm -fr obj_dir/
 	rm -f tb-sig.h tb-top.h tb.py
 	rm -f TopSim.v
