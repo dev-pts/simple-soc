@@ -1,0 +1,71 @@
+interface: IBusAddr:
+		ADDR_WIDTH = 32
+	port: Master / Slave
+		addr: net[ADDR_WIDTH]: out / in
+		wen: net: out / in
+		len: net[8]: out / in
+		valid: net: out / in
+		ready: net: in / out
+	macros:
+		slave(skid) = block:
+			skid.data = { addr, len, wen }
+			skid.valid = valid
+			ready = skid.ready
+
+		master(skid) = block:
+			{ addr, len, wen } = skid.data
+			valid = skid.valid
+			skid.ready = ready
+
+interface: IBusWriteData:
+		DATA_BYTES = 4
+	port: Master / Slave
+		data: net[DATA_BYTES * 8]: out / in
+		strb: net[DATA_BYTES]: out / in
+		valid: net: out / in
+		ready: net: in / out
+	macros:
+		slave(skid) = block:
+			skid.data = { data, strb }
+			skid.valid = valid
+			ready = skid.ready
+
+		master(skid) = block:
+			{ data, strb } = skid.data
+			valid = skid.valid
+			skid.ready = ready
+
+interface: IBusReadData:
+		DATA_BYTES = 4
+	port: Master / Slave
+		data: net[DATA_BYTES * 8]: in / out
+		valid: net: in / out
+		ready: net: out / in
+	macros:
+		slave(skid) = block:
+			data = skid.data
+			valid = skid.valid
+			skid.ready = ready
+
+		master(skid) = block:
+			skid.data = data
+			skid.valid = valid
+			ready = skid.ready
+
+interface: IBus:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+	port: Master / Slave
+		a: IBusAddr(ADDR_WIDTH = ADDR_WIDTH): Master / Slave
+		r: IBusReadData(DATA_BYTES = DATA_BYTES): Master / Slave
+		w: IBusWriteData(DATA_BYTES = DATA_BYTES): Master / Slave
+	macros:
+		skid_slave(addr, wdata, rdata) = block:
+			@a.slave(addr.slave)
+			@w.slave(wdata.slave)
+			@r.slave(rdata.master)
+
+		skid_master(addr, wdata, rdata) = block:
+			@a.master(addr.master)
+			@w.master(wdata.master)
+			@r.master(rdata.slave)

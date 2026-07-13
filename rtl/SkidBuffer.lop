@@ -1,0 +1,38 @@
+interface: IHandshake:
+		WIDTH = 32
+	port: Master / Slave
+		data: net[WIDTH]: out / in
+		valid: net: out / in
+		ready: net: in / out
+
+module: SkidBuffer:
+		WIDTH = 32
+	port:
+		clk: in
+		reset: in
+
+		slave: IHandshake.Slave(WIDTH = WIDTH)
+		master: IHandshake.Master(WIDTH = WIDTH)
+	local:
+		buffer: net[WIDTH]
+		ready: net
+
+	if: ready
+		master.data = slave.data
+		master.valid = slave.valid
+	else:
+		master.data = buffer
+		master.valid = 1
+
+	slave.ready = master.ready | ready
+
+	ff: +clk
+		if: master.valid & master.ready
+			ready = 1
+
+		if: slave.valid & slave.ready & (~master.ready | ~ready)
+			buffer = slave.data
+			ready = 0
+
+		if: reset
+			ready = 1

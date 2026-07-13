@@ -1,0 +1,136 @@
+module: BusSimpleSRAM:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+		WBYTES = 4
+		HEIGHT = 512
+		INIT_FILE = ""
+		WORD = 8
+		ALIGN_HEIGHT_UP = (1 << 9) - 1
+	port:
+		clk: in
+		reset: in
+
+		bus: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+	submodule:
+		sram_wrapper: BusSimpleSRAMWrapper(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES, WBYTES = WBYTES, HEIGHT = HEIGHT, INIT_FILE = INIT_FILE, WORD = WORD, ALIGN_HEIGHT_UP = ALIGN_HEIGHT_UP)
+
+		sb: BusSimpleSRAMSkidBuffer(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+
+	sb.clk = clk
+	sb.reset = reset
+
+	$connect(sb.slave, bus)
+	$connect(sram_wrapper.bus, sb.master)
+
+	sram_wrapper.clk = clk
+	sram_wrapper.reset = reset
+
+module: BusSimpleSRAMSkidBuffer:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+	port:
+		clk: in
+		reset: in
+
+		slave: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+		master: IBus.Master(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+	submodule:
+		addr: SkidBuffer(WIDTH = ADDR_WIDTH + 8 + 1)
+		wdata: SkidBuffer(WIDTH = DATA_BYTES * 8 + DATA_BYTES)
+		rdata: SkidBuffer(WIDTH = DATA_BYTES * 8)
+
+	addr.clk = clk
+	addr.reset = reset
+
+	wdata.clk = clk
+	wdata.reset = reset
+
+	rdata.clk = clk
+	rdata.reset = reset
+
+	@slave.skid_slave(addr, wdata, rdata)
+	@master.skid_master(addr, wdata, rdata)
+
+	\\ If our read skid buffer is full and nobody reads it,
+	\\ we tell the requester that we can't get more addresses,
+	\\ and tell the receiver that it does not have any new requests.
+	if: ~rdata.slave.ready
+		slave.a.ready = 0
+		master.a.valid = 0
+
+module: BusSimpleSRAMWrapper:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+		WBYTES = 4
+		HEIGHT = 512
+		INIT_FILE = ""
+		WORD = 8
+		ALIGN_HEIGHT_UP = (1 << 9) - 1
+	port:
+		clk: in
+		reset: in
+
+		bus: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+	submodule:
+		sram: SimpleSRAM(WBYTES = WBYTES, HEIGHT = HEIGHT, INIT_FILE = INIT_FILE, WORD = WORD, ALIGN_HEIGHT_UP = ALIGN_HEIGHT_UP)
+	local:
+		addr: net[32]
+		data: net[32]
+		pending_w: net
+		pending_r: net
+		len: net[8]
+
+		aready: net
+		req: net = bus.a.valid & bus.a.ready
+
+		dread: net = bus.r.valid & bus.r.ready
+		dwrite: net = bus.w.valid & bus.w.ready
+		dlast: net = len == 0
+
+	sram.clk = clk
+
+	sram.addr = addr
+	if: dread & ~dlast
+		sram.addr = addr + 1
+	if: req
+		sram.addr = bus.a.addr
+
+	sram.wdata = bus.w.data
+	sram.wstrb = bus.w.strb
+	sram.wen = bus.w.valid & (pending_w | (req & bus.a.wen))
+
+	bus.a.ready = aready
+	bus.r.data = sram.rdata
+	bus.r.valid = pending_r
+	bus.w.ready = 1
+
+	ff: +clk
+		if: (pending_r & dread) | (pending_w & dwrite)
+			len = len - 1
+			addr = addr + 1
+			if: len == 0
+				pending_r = 0
+				pending_w = 0
+				aready = 1
+
+		if: req
+			addr = bus.a.addr
+			len = bus.a.len
+
+			if: bus.a.wen & dwrite
+				len = bus.a.len - 1
+				addr = bus.a.addr + 1
+
+			if: ~bus.a.wen
+				pending_r = 1
+
+			if: |bus.a.len | (bus.a.wen & ~dwrite)
+				aready = 0
+				if: bus.a.wen
+					pending_w = 1
+
+		if: reset
+			aready = 1
+
+			pending_w = 0
+			pending_r = 0
