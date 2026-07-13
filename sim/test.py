@@ -1,15 +1,16 @@
 import numpy as np
 
 import VeriTest
+import tb
 
 def task1(dut):
 	p = dut.port
 
-	p.clk = 1
-	p.reset = 1
+	p.clk.set(1)
+	p.reset.set(1)
 	dut.wait(10)
 
-	p.reset = 0
+	p.reset.set(0)
 
 	dut.semaphore()
 
@@ -22,7 +23,7 @@ def task2(dut):
 
 	uart = VeriTest.UART(dut, p.uart_in, 50_000_000 / 2_000_000)
 
-	p.uart_in = 1
+	p.uart_in.set(1)
 	p.reset.wait(0)
 
 	# Assert reset
@@ -42,7 +43,7 @@ def task2(dut):
 	uart.tx(b'\x00\x00\x00\x00')
 	uart.tx(b'\x00')
 
-vt = VeriTest.VeriTest(['clk', 'reset', 'uart_in'], 'simx.vcd')
+vt = VeriTest.VeriTest(tb.ports, 'simx.vcd')
 vt.add(task1)
 vt.add(task2)
 vt.run()
