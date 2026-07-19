@@ -7,13 +7,15 @@ interface: IBusAddr:
 		valid: net: out / in
 		ready: net: in / out
 	macros:
+		hsdata = { addr, len, wen }
+
 		slave(skid) = block:
-			skid.data = { addr, len, wen }
+			skid.data = @hsdata
 			skid.valid = valid
 			ready = skid.ready
 
 		master(skid) = block:
-			{ addr, len, wen } = skid.data
+			@hsdata = skid.data
 			valid = skid.valid
 			skid.ready = ready
 
@@ -25,13 +27,15 @@ interface: IBusWriteData:
 		valid: net: out / in
 		ready: net: in / out
 	macros:
+		hsdata = { data, strb }
+
 		slave(skid) = block:
-			skid.data = { data, strb }
+			skid.data = @hsdata
 			skid.valid = valid
 			ready = skid.ready
 
 		master(skid) = block:
-			{ data, strb } = skid.data
+			@hsdata = skid.data
 			valid = skid.valid
 			skid.ready = ready
 
@@ -42,13 +46,15 @@ interface: IBusReadData:
 		valid: net: in / out
 		ready: net: out / in
 	macros:
+		hsdata = data
+
 		slave(skid) = block:
-			data = skid.data
+			@hsdata = skid.data
 			valid = skid.valid
 			skid.ready = ready
 
 		master(skid) = block:
-			skid.data = data
+			skid.data = @hsdata
 			skid.valid = valid
 			ready = skid.ready
 

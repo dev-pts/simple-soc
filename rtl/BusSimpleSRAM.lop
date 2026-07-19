@@ -16,13 +16,13 @@ module: BusSimpleSRAM:
 
 		sb: BusSimpleSRAMSkidBuffer(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
 
-	sb.clk = clk
+	$bind(sb.clk, clk)
 	sb.reset = reset
 
 	$connect(sb.slave, bus)
 	$connect(sram_wrapper.bus, sb.master)
 
-	sram_wrapper.clk = clk
+	$bind(sram_wrapper.clk, clk)
 	sram_wrapper.reset = reset
 
 module: BusSimpleSRAMSkidBuffer:
@@ -39,13 +39,13 @@ module: BusSimpleSRAMSkidBuffer:
 		wdata: SkidBuffer(WIDTH = DATA_BYTES * 8 + DATA_BYTES)
 		rdata: SkidBuffer(WIDTH = DATA_BYTES * 8)
 
-	addr.clk = clk
+	$bind(addr.clk, clk)
 	addr.reset = reset
 
-	wdata.clk = clk
+	$bind(wdata.clk, clk)
 	wdata.reset = reset
 
-	rdata.clk = clk
+	$bind(rdata.clk, clk)
 	rdata.reset = reset
 
 	@slave.skid_slave(addr, wdata, rdata)
@@ -87,7 +87,7 @@ module: BusSimpleSRAMWrapper:
 		dwrite: net = bus.w.valid & bus.w.ready
 		dlast: net = len == 0
 
-	sram.clk = clk
+	$bind(sram.clk, clk)
 
 	sram.addr = addr
 	if: dread & ~dlast

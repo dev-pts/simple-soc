@@ -5,6 +5,46 @@ interface: IHandshake:
 		valid: net: out / in
 		ready: net: in / out
 
+module: HSDemux:
+		PORTS = 2
+		WIDTH = 32
+	port:
+		slave: IHandshake.Slave(WIDTH = WIDTH)
+
+		master[PORTS]: IHandshake.Master(WIDTH = WIDTH)
+		sel: in[PORTS]
+
+	slave.ready = |for(i, master[i].ready & sel[i])
+
+	for: i
+		master[i].data = slave.data
+		master[i].valid = slave.valid & sel[i]
+
+module: HSMux:
+		PORTS = 2
+		WIDTH = 32
+	port:
+		slave[PORTS]: IHandshake.Slave(WIDTH = WIDTH)
+		sel: in[PORTS]
+
+		master: IHandshake.Master(WIDTH = WIDTH)
+	local:
+		masked[PORTS]: net[WIDTH]
+		mux[PORTS]: net[WIDTH]
+
+	for: i
+		masked[i] = slave[i].data & WIDTH{ sel[i] }
+
+	mux[0] = masked[0]
+	for: i, if: i > 0
+		mux[i] = mux[i - 1] | masked[i]
+
+	master.data = mux[-1]
+	master.valid = |for(i, slave[i].valid & sel[i])
+
+	for: i
+		slave[i].ready = master.ready & sel[i]
+
 module: SkidBuffer:
 		WIDTH = 32
 	port:
@@ -36,3 +76,35 @@ module: SkidBuffer:
 
 		if: reset
 			ready = 1
+
+\\ slave: outside world, no combinatorial tolerance, must be registered
+\\ master: inside world, can tolerate loops
+module: SkidBufferReg:
+		WIDTH = 32
+	port:
+		clk: in
+		reset: in
+
+		slave: IHandshake.Slave(WIDTH = WIDTH)
+		master: IHandshake.Master(WIDTH = WIDTH)
+	submodule:
+		sb: SkidBuffer(WIDTH = WIDTH)
+
+	\\ FXIME BUG in Verilator on always (@clk) sb.clk <= clk
+	$bind(sb.clk, clk)
+	sb.reset = reset
+
+	$connect(master, sb.master)
+
+	ff: +clk
+		slave.ready = ~(slave.valid & master.valid & ~master.ready)
+
+		if: sb.slave.valid & sb.slave.ready
+			sb.slave.valid = 0
+
+		if: slave.valid & slave.ready
+			sb.slave.data = slave.data
+			sb.slave.valid = 1
+
+		if: reset
+			sb.slave.valid = 0

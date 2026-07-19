@@ -1,0 +1,95 @@
+interface: IDemux:
+		WIDTH = 32
+	port: Port
+		start: net[WIDTH]: in
+		end: net[WIDTH]: in
+
+module: BusDemux:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+		PORTS = 2
+		SEL_HI = 31
+		SEL_LO = 0
+	port:
+		clk: in
+		reset: in
+
+		slave: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+		master[PORTS]: IBus.Master(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+
+		desc[PORTS]: IDemux.Port(WIDTH = SEL_HI - SEL_LO + 1)
+	submodule:
+		ademux: HSDemux(PORTS = PORTS, WIDTH = ADDR_WIDTH + 8 + 1)
+		wdemux: HSDemux(PORTS = PORTS, WIDTH = DATA_BYTES * 8 + DATA_BYTES)
+		rmux: HSMux(PORTS = PORTS, WIDTH = DATA_BYTES * 8)
+	local:
+		sel: net[PORTS]
+		len: net[8]
+		busy: net = |sel
+		abusy: net
+		last: net = len == 0
+
+	ademux.slave.data = @slave.a.hsdata
+	ademux.slave.valid = slave.a.valid & abusy
+	slave.a.ready = ademux.slave.ready & abusy
+
+	@slave.w.slave(wdemux.slave)
+	@slave.r.slave(rmux.master)
+
+	for: i
+		@master[i].a.master(ademux.master[i])
+		@master[i].w.master(wdemux.master[i])
+		@master[i].r.master(rmux.slave[i])
+
+	ademux.sel = sel
+	wdemux.sel = sel
+	rmux.sel = sel
+
+	ff: +clk
+		if: slave.a.valid & slave.a.ready
+			abusy = 0
+
+		if: busy
+			if: (slave.r.valid & slave.r.ready) | (slave.w.valid & slave.w.ready)
+				len = len - 1
+				if: last
+					sel = 0
+
+		if: slave.a.valid & ~busy
+			abusy = 1
+			len = slave.a.len
+
+			for: i
+				sel[i] = desc[i].start <= slave.a.addr[SEL_HI .. SEL_LO] && slave.a.addr[SEL_HI .. SEL_LO] <= desc[i].end
+
+		if: reset
+			abusy = 0
+			sel = 0
+
+module: BusDemuxTest:
+		PORTS = 2
+	port:
+		clk: in
+		reset: in
+
+		bus: IBus.Slave
+	submodule:
+		demux: BusDemux(PORTS = PORTS)
+		sram[PORTS]: BusSimpleSRAM
+
+	$bind(demux.clk, clk)
+	demux.reset = reset
+
+	for: i
+		$bind(sram[i].clk, clk)
+		sram[i].reset = reset
+
+	$connect(bus, demux.slave)
+
+	for: i
+		$connect(demux.master[i], sram[i].bus)
+
+	demux.desc[0].start = 0x0000_0000
+	demux.desc[0].end = 0x0001_0000 - 1
+	demux.desc[1].start = 0x8000_0000
+	demux.desc[1].end = 0x8001_0000 - 1

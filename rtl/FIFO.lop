@@ -1,0 +1,78 @@
+interface: FIFOPort:
+		DATA_WIDTH = 8
+	port: Read / Write
+		data: net[DATA_WIDTH]: out / in
+		valid: net: out / in
+		ready: net: in / out
+		last: net: out / out
+
+module: FIFO:
+		WIDTH = 32
+		HEIGHT = 4
+	const:
+		WBYTES = $ceil(WIDTH / 8)
+	port:
+		clk: in
+		reset: in
+
+		rd: FIFOPort.Read(DATA_WIDTH = WIDTH)
+		wr: FIFOPort.Write(DATA_WIDTH = WIDTH)
+
+		half: out
+		empty: out
+		full: out
+	submodule:
+		sram: SimpleSRAM(WBYTES = WBYTES, HEIGHT = HEIGHT)
+	local:
+		head: net[$clog2(HEIGHT)]
+		tail: net[$clog2(HEIGHT)]
+
+		head_next: net[$clog2(HEIGHT)] = head + 1
+		tail_next: net[$clog2(HEIGHT)] = tail + 1
+		tail_math: net[$clog2(HEIGHT)] = tail - head
+
+		skid: net[WIDTH]
+
+	rd.last = head_next == tail
+	wr.last = tail_next == head
+
+	half = tail_math < $int(HEIGHT / 2)
+
+	sram.clk = clk
+
+	sram.addr = tail
+	sram.wdata = wr.data
+	sram.wstrb = -1
+	sram.wen = wr.valid & ~full
+
+	if: rd.ready & ~empty
+		sram.addr = head
+
+	rd.data = sram.rdata
+
+	wr.ready = ~full
+
+	ff: +clk
+		rd.valid = 0
+
+		if: rd.valid
+			skid = sram.rdata
+
+		if: wr.valid & ~full
+			tail = tail_next
+			if: wr.last
+				full = 1
+			empty = 0
+
+		if: rd.ready & ~empty
+			head = head_next
+			if: rd.last
+				empty = 1
+			full = 0
+			rd.valid = 1
+
+		if: reset
+			head = 0
+			tail = 0
+			empty = 1
+			full = 0

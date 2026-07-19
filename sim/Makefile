@@ -3,6 +3,7 @@ TB_CPP ?= tb.cpp
 GEN_TB_H ?= sh gen-tb-h.sh
 TEST ?= test.py
 VERI_TEST ?= VeryTest.py
+CLK ?= 
 
 tb: $(TB_CPP) TopSim.v
 	$(VERILATOR) --trace-underscore --no-timing --x-initial-edge --cc --trace -Wno-lint --exe --build -O3 --x-assign fast --x-initial fast --noassert -Wno-fatal --top $(TOP) \
@@ -18,7 +19,7 @@ a.bin: a.c
 
 TopSim.v: king.lop
 	$(LOP_HDL) gen-verilog $(TOP) $^ > TopSim.v
-	$(GEN_TB_H) $(TOP) $^
+	$(GEN_TB_H) $(TOP) $^ $(CLK)
 
 clean:
 	rm -fr __pycache__

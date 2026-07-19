@@ -44,7 +44,8 @@ run() {
 		LOP_HDL="python3 ../tools/lop-hdl/main.py" \
 		GEN_TB_H="sh $(pwd)/../tools/veri-test/gen-tb-h.sh" \
 		VERI_TEST=$(pwd)/../tools/veri-test/VeriTest.py \
-		TOP=$2
+		TOP=$2 \
+		CLK=$3
 
 	make run \
 		VERI_TEST=$(pwd)/../tools/veri-test/VeriTest.py \
@@ -55,4 +56,7 @@ run() {
 	cd -
 }
 
-$1 $2 $3
+cmd=$1
+shift
+
+$cmd $@

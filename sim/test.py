@@ -24,7 +24,9 @@ def task2(dut):
 	uart = VeriTest.UART(dut, p.uart_in, 50_000_000 / 2_000_000)
 
 	p.uart_in.set(1)
-	p.reset.wait(0)
+
+	p.reset.addwait(0)
+	dut.wait()
 
 	# Assert reset
 	uart.break_cond()
