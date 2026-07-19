@@ -1,0 +1,83 @@
+module: BusArbiter:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+		PORTS = 2
+	port:
+		clk: in
+		reset: in
+
+		slave[PORTS]: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+		master: IBus.Master(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+	submodule:
+		amux: HSMux(PORTS = PORTS, WIDTH = ADDR_WIDTH + 8 + 1)
+		wmux: HSMux(PORTS = PORTS, WIDTH = DATA_BYTES * 8 + DATA_BYTES)
+		rdemux: HSDemux(PORTS = PORTS, WIDTH = DATA_BYTES * 8)
+	local:
+		sel_r: net[PORTS]
+		sel_next: net[PORTS] = { sel_r[-2 .. 0], sel_r[-1] }
+		sel: net[PORTS] = mux(busy, sel_r, sel_next)
+
+		len: net[8]
+		busy: net
+		abusy: net
+		last: net = len == 0
+
+	@master.a.master(amux.master)
+	@master.w.master(wmux.master)
+	@master.r.master(rdemux.slave)
+
+	for: i
+		@slave[i].a.slave(amux.slave[i])
+		@slave[i].w.slave(wmux.slave[i])
+		@slave[i].r.slave(rdemux.master[i])
+
+	amux.sel = sel & PORTS{ abusy }
+	wmux.sel = sel & PORTS{ busy }
+	rdemux.sel = sel & PORTS{ busy }
+
+	ff: +clk
+		if: busy
+			if: (master.r.valid & master.r.ready) | (master.w.valid & master.w.ready)
+				len = len - 1
+				if: last
+					busy = 0
+
+		if: master.a.valid & master.a.ready
+			abusy = 0
+
+		for: i
+			if: sel_next[i] & slave[i].a.valid & ~busy
+				abusy = 1
+				busy = 1
+				len = slave[i].a.len
+
+		if: ~busy
+			sel_r = sel_next
+
+		if: reset
+			abusy = 0
+			busy = 0
+			sel_r = 0
+			sel_r[-1] = 1
+
+module: BusArbiterTest:
+		PORTS = 2
+	port:
+		clk: in
+		reset: in
+
+		bus[PORTS]: IBus.Slave
+	submodule:
+		arb: BusArbiter(PORTS = PORTS)
+		sram: BusSimpleSRAM
+
+	$bind(arb.clk, clk)
+	arb.reset = reset
+
+	$bind(sram.clk, clk)
+	sram.reset = reset
+
+	for: i
+		$connect(bus[i], arb.slave[i])
+
+	$connect(arb.master, sram.bus)
