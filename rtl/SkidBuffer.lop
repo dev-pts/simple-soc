@@ -90,8 +90,7 @@ module: SkidBufferReg:
 	submodule:
 		sb: SkidBuffer(WIDTH = WIDTH)
 
-	\\ FXIME BUG in Verilator on always (@clk) sb.clk <= clk
-	$bind(sb.clk, clk)
+	sb.clk = clk
 	sb.reset = reset
 
 	$connect(master, sb.master)

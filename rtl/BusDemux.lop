@@ -77,11 +77,11 @@ module: BusDemuxTest:
 		demux: BusDemux(PORTS = PORTS)
 		sram[PORTS]: BusSimpleSRAM
 
-	$bind(demux.clk, clk)
+	demux.clk = clk
 	demux.reset = reset
 
 	for: i
-		$bind(sram[i].clk, clk)
+		sram[i].clk = clk
 		sram[i].reset = reset
 
 	$connect(bus, demux.slave)

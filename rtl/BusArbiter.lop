@@ -71,10 +71,10 @@ module: BusArbiterTest:
 		arb: BusArbiter(PORTS = PORTS)
 		sram: BusSimpleSRAM
 
-	$bind(arb.clk, clk)
+	arb.clk = clk
 	arb.reset = reset
 
-	$bind(sram.clk, clk)
+	sram.clk = clk
 	sram.reset = reset
 
 	for: i

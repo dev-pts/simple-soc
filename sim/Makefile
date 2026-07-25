@@ -6,7 +6,7 @@ VERI_TEST ?= VeryTest.py
 CLK ?= 
 
 tb: $(TB_CPP) TopSim.v
-	$(VERILATOR) --trace-underscore --no-timing --x-initial-edge --cc --trace -Wno-lint --exe --build -O3 --x-assign fast --x-initial fast --noassert -Wno-fatal --top $(TOP) \
+	$(VERILATOR) --trace-underscore --no-timing --x-initial-edge --cc --trace -Wno-lint --exe --build -O3 --x-assign fast --x-initial fast --noassert -Wno-fatal -Wno-unoptflat --top $(TOP) \
 		-CFLAGS "-I$(PWD)" \
 		--build-jobs $(shell nproc) \
 		$^
