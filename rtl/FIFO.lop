@@ -21,6 +21,8 @@ module: FIFO:
 		half: out
 		empty: out
 		full: out
+
+		prio_rd: in
 	submodule:
 		sram: SimpleSRAM(WBYTES = WBYTES, HEIGHT = HEIGHT)
 	local:
@@ -31,7 +33,7 @@ module: FIFO:
 		tail_next: net[$clog2(HEIGHT)] = tail + 1
 		tail_math: net[$clog2(HEIGHT)] = tail - head
 
-		skid: net[WIDTH]
+		read_pending: net
 
 	rd.last = head_next == tail
 	wr.last = tail_next == head
@@ -43,36 +45,59 @@ module: FIFO:
 	sram.addr = tail
 	sram.wdata = wr.data
 	sram.wstrb = -1
-	sram.wen = wr.valid & ~full
+	sram.wen = wr.valid & wr.ready
 
-	if: rd.ready & ~empty
-		sram.addr = head
+	read_pending = 0
+
+	if: ~sram.wen
+		if: full
+			sram.addr = head
+			read_pending = 1
+
+		if: rd.ready & ~empty & (~wr.valid | prio_rd) & ~(rd.valid & rd.ready & rd.last)
+			sram.addr = head
+			read_pending = 1
+
+		if: rd.valid & rd.ready & ~rd.last
+			sram.addr = head_next
+			read_pending = 1
 
 	rd.data = sram.rdata
 
-	wr.ready = ~full
-
 	ff: +clk
-		rd.valid = 0
+		rd.valid = read_pending
 
-		if: rd.valid
-			skid = sram.rdata
+		if: empty | (wr.valid & ~full & (~rd.ready | ~prio_rd))
+			wr.ready = 1
 
-		if: wr.valid & ~full
+		if: wr.valid & wr.ready & rd.ready & prio_rd
+			wr.ready = 0
+
+		if: rd.ready & rd.last & ~rd.valid & wr.valid & ~wr.ready & prio_rd
+			wr.ready = 1
+
+		if: rd.valid & rd.ready & rd.last
+			wr.ready = 1
+
+		if: wr.valid & wr.ready
 			tail = tail_next
 			if: wr.last
 				full = 1
+				wr.ready = 0
 			empty = 0
 
-		if: rd.ready & ~empty
+		if: rd.valid & rd.ready
 			head = head_next
 			if: rd.last
-				empty = 1
+				empty = ~(wr.valid & wr.ready)
+				rd.valid = 0
 			full = 0
-			rd.valid = 1
 
 		if: reset
 			head = 0
 			tail = 0
 			empty = 1
 			full = 0
+
+			rd.valid = 0
+			wr.ready = 0

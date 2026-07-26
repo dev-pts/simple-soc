@@ -4,11 +4,11 @@ import tb
 def task1(dut):
 	p = dut.port
 
-	dut.dump(True)
-
 	p.clk.set(1)
 	p.reset.set(1)
 	dut.wait(10)
+
+	dut.dump(True)
 
 	p.reset.set(0)
 	dut.wait(2)
@@ -27,74 +27,147 @@ vt.start()
 w.semaphore()
 r.semaphore()
 
+def cond_creator():
+	i = 0
+	while True:
+		yield str(i)
+		i += 1
+
+cc = cond_creator()
+
 def next_test():
-	vt.wait(4)
+	vt.wait(10)
 	vt.semaphore(w, r)
 
-def write(dut, data):
+wdata = 1
+
+def write(dut, count=1, cond=None):
 	def task():
+		global wdata
 		p = dut.port
 
-		p.wr.data.set(data)
-		p.wr.valid.set(1)
+		for i in range(count):
+			p.wr.data.set(wdata)
+			p.wr.valid.set(1)
 
-		p.clk.addwait(0)
-		p.wr.ready.addwait(1)
-		dut.wait()
+			p.clk.addwait(0)
+			p.wr.ready.addwait(1)
+			dut.wait()
 
-		dut.wait(1)
-		p.wr.valid.set(0)
+			dut.wait(1)
+			p.wr.valid.set(0)
+
+			wdata += 1
+
+		if cond:
+			dut.cond_notify(cond)
 
 	dut.ev.run(task)
 	dut.ev.wait()
 
-def read(dut):
+def read(dut, count=1, cond=None):
 	def task():
 		p = dut.port
 
-		p.rd.ready.set(1)
+		if cond:
+			dut.cond_wait(cond)
 
-		p.clk.addwait(0)
-		p.rd.valid.addwait(1)
-		dut.wait()
+		for i in range(count):
+			p.rd.ready.set(1)
 
-		dut.wait(1)
-		p.rd.ready.set(0)
+			p.clk.addwait(0)
+			p.rd.valid.addwait(1)
+			dut.wait()
+
+			dut.wait(1)
+			p.rd.ready.set(0)
 
 	dut.ev.run(task)
 	dut.ev.wait()
 
-if True:
-	write(w, 0x1)
+def whole_test(prio_rd):
+	global wdata
 
-	next_test()
+	w.port.prio_rd.set(prio_rd)
 
-if True:
-	read(r)
+	wdata = 0x1
 
-	next_test()
+	if True:
+		write(w)
+		vt.wait(4)
+		read(r)
 
-if True:
-	write(w, 0x2)
-	w.wait(2)
-	write(w, 0x3)
-	w.wait(2)
-	write(w, 0x4)
-	w.wait(2)
-	write(w, 0x5)
+		next_test()
 
-	next_test()
+	if True:
+		cond = next(cc)
 
-if True:
-	read(r)
-	r.wait(2)
-	read(r)
-	r.wait(2)
-	read(r)
-	r.wait(2)
-	read(r)
+		write(w, 4, cond)
+		read(r, 4, cond)
 
-	next_test()
+		next_test()
+
+	if True:
+		write(w, 4)
+		read(r, 4)
+
+		next_test()
+
+	if True:
+		cond = next(cc)
+
+		write(w, 2, cond)
+		write(w, 2)
+		read(r, 4, cond)
+
+		next_test()
+
+	if True:
+		write(w, 8)
+		vt.wait(14)
+		read(r, 8)
+
+		next_test()
+
+	if True:
+		cond = next(cc)
+
+		write(w)
+		w.wait(2)
+		write(w)
+		w.wait(2)
+		write(w)
+		w.wait(2)
+		write(w, cond=cond)
+
+		r.cond_wait(cond)
+		r.wait(6)
+
+		read(r)
+		r.wait(6)
+		read(r)
+		r.wait(2)
+		read(r)
+		r.wait(2)
+		read(r)
+
+		next_test()
+
+	if True:
+		write(w)
+		w.wait(2)
+		write(w)
+		w.wait(2)
+		write(w)
+		w.wait(2)
+		write(w)
+
+		read(r, 4)
+
+		next_test()
+
+whole_test(0)
+whole_test(1)
 
 w.ev.stop()
 r.ev.stop()
