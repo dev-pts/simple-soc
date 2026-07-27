@@ -50,46 +50,38 @@ module: FIFO:
 	read_pending = 0
 
 	if: ~sram.wen
-		if: full
-			sram.addr = head
-			read_pending = 1
+		sram.addr = head
+		read_pending = ~empty & rd.ready
 
-		if: rd.ready & ~empty & (~wr.valid | prio_rd) & ~(rd.valid & rd.ready & rd.last)
-			sram.addr = head
-			read_pending = 1
-
-		if: rd.valid & rd.ready & ~rd.last
+		if: rd.valid & rd.ready
 			sram.addr = head_next
-			read_pending = 1
+			read_pending = ~rd.last
 
 	rd.data = sram.rdata
 
 	ff: +clk
 		rd.valid = read_pending
 
-		if: empty | (wr.valid & ~full & (~rd.ready | ~prio_rd))
+		if: empty | (wr.valid & ~full)
 			wr.ready = 1
 
-		if: wr.valid & wr.ready & rd.ready & prio_rd
+		if: rd.ready & prio_rd
 			wr.ready = 0
 
-		if: rd.ready & rd.last & ~rd.valid & wr.valid & ~wr.ready & prio_rd
-			wr.ready = 1
-
-		if: rd.valid & rd.ready & rd.last
+		if: rd.ready & ((rd.valid & ~prio_rd) | rd.last)
 			wr.ready = 1
 
 		if: wr.valid & wr.ready
 			tail = tail_next
 			if: wr.last
 				full = 1
-				wr.ready = 0
+				wr.ready = rd.valid & rd.ready & ~prio_rd
 			empty = 0
 
 		if: rd.valid & rd.ready
 			head = head_next
 			if: rd.last
-				empty = ~(wr.valid & wr.ready)
+				empty = ~sram.wen
 				rd.valid = 0
 			full = 0
 
@@ -100,4 +92,4 @@ module: FIFO:
 			full = 0
 
 			rd.valid = 0
-			wr.ready = 0
+			wr.ready = 1
