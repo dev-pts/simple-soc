@@ -1,0 +1,35 @@
+module: BusCPU:
+		ADDR_WIDTH = 32
+	port:
+		clk: in
+		reset: in
+
+		cpu: ICPU.Slave(ADDR_WIDTH = ADDR_WIDTH)
+		bus: IBus.Master
+	local:
+		req: net = |cpu.wmask | cpu.rstrb
+		a_done: net
+
+	bus.a.addr = cpu.addr
+	bus.a.wen = |cpu.wmask
+	bus.a.len = 0
+	bus.a.valid = req & ~a_done
+
+	bus.w.data = cpu.wdata
+	bus.w.strb = cpu.wmask
+	bus.w.valid = |cpu.wmask & ~cpu.rstrb
+
+	bus.r.ready = 1
+
+	cpu.rdata = bus.r.data
+	cpu.busy = ~((bus.w.valid & bus.w.ready) | (bus.r.valid & bus.r.ready))
+
+	ff: +clk
+		if: bus.a.valid & bus.a.ready
+			a_done = 1
+
+		if: (bus.w.valid & bus.w.ready) | (bus.r.valid & bus.r.ready)
+			a_done = 0
+
+		if: reset
+			a_done = 0
