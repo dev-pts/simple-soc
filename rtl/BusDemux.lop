@@ -17,7 +17,7 @@ module: BusDemux:
 		slave: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
 		master[PORTS]: IBus.Master(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
 
-		desc[PORTS]: IDemux.Port(WIDTH = SEL_HI - SEL_LO + 1)
+		desc[PORTS]: IDemux.Port(WIDTH = ADDR_WIDTH)
 	submodule:
 		ademux: HSDemux(PORTS = PORTS, WIDTH = ADDR_WIDTH + 8 + 1)
 		wdemux: HSDemux(PORTS = PORTS, WIDTH = DATA_BYTES * 8 + DATA_BYTES)
@@ -60,7 +60,7 @@ module: BusDemux:
 			len = slave.a.len
 
 			for: i
-				sel[i] = desc[i].start <= slave.a.addr[SEL_HI .. SEL_LO] && slave.a.addr[SEL_HI .. SEL_LO] <= desc[i].end
+				sel[i] = desc[i].start[SEL_HI .. SEL_LO] <= slave.a.addr[SEL_HI .. SEL_LO] && slave.a.addr[SEL_HI .. SEL_LO] <= desc[i].end[SEL_HI .. SEL_LO]
 
 		if: reset
 			abusy = 0
