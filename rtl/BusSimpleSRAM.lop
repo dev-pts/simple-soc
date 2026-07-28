@@ -14,7 +14,7 @@ module: BusSimpleSRAM:
 	submodule:
 		sram_wrapper: BusSimpleSRAMWrapper(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES, WBYTES = WBYTES, HEIGHT = HEIGHT, INIT_FILE = INIT_FILE, WORD = WORD, ALIGN_HEIGHT_UP = ALIGN_HEIGHT_UP)
 
-		sb: BusSimpleSRAMSkidBuffer(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+		sb: BusSkidBuffer(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
 
 	sb.clk = clk
 	sb.reset = reset
@@ -24,39 +24,6 @@ module: BusSimpleSRAM:
 
 	sram_wrapper.clk = clk
 	sram_wrapper.reset = reset
-
-module: BusSimpleSRAMSkidBuffer:
-		ADDR_WIDTH = 32
-		DATA_BYTES = 4
-	port:
-		clk: in
-		reset: in
-
-		slave: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
-		master: IBus.Master(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
-	submodule:
-		addr: SkidBuffer(WIDTH = ADDR_WIDTH + 8 + 1)
-		wdata: SkidBuffer(WIDTH = DATA_BYTES * 8 + DATA_BYTES)
-		rdata: SkidBuffer(WIDTH = DATA_BYTES * 8)
-
-	addr.clk = clk
-	addr.reset = reset
-
-	wdata.clk = clk
-	wdata.reset = reset
-
-	rdata.clk = clk
-	rdata.reset = reset
-
-	@slave.skid_slave(addr, wdata, rdata)
-	@master.skid_master(addr, wdata, rdata)
-
-	\\ If our read skid buffer is full and nobody reads it,
-	\\ we tell the requester that we can't get more addresses,
-	\\ and tell the receiver that it does not have any new requests.
-	if: ~rdata.slave.ready
-		slave.a.ready = 0
-		master.a.valid = 0
 
 module: BusSimpleSRAMWrapper:
 		ADDR_WIDTH = 32
