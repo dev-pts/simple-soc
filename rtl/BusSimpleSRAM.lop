@@ -80,6 +80,7 @@ module: BusSimpleSRAMWrapper:
 		pending_r: net
 		len: net[8]
 
+		bus_addr: net[ADDR_WIDTH - $clog2(DATA_BYTES)] = bus.a.addr[-1 .. $clog2(DATA_BYTES)]
 		aready: net
 		req: net = bus.a.valid & bus.a.ready
 
@@ -93,7 +94,7 @@ module: BusSimpleSRAMWrapper:
 	if: dread & ~dlast
 		sram.addr = addr + 1
 	if: req
-		sram.addr = bus.a.addr
+		sram.addr = bus_addr
 
 	sram.wdata = bus.w.data
 	sram.wstrb = bus.w.strb
@@ -114,12 +115,12 @@ module: BusSimpleSRAMWrapper:
 				aready = 1
 
 		if: req
-			addr = bus.a.addr
+			addr = bus_addr
 			len = bus.a.len
 
 			if: bus.a.wen & dwrite
 				len = bus.a.len - 1
-				addr = bus.a.addr + 1
+				addr = bus_addr + 1
 
 			if: ~bus.a.wen
 				pending_r = 1
