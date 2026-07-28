@@ -28,7 +28,7 @@ def a_send(dut, addr, wen, size=0, cond=None):
 	def task():
 		p = dut.port
 
-		p.bus.a.addr.set(addr)
+		p.bus.a.addr.set(addr << 2)
 		p.bus.a.wen.set(wen)
 		p.bus.a.len.set(size)
 		p.bus.a.valid.set(1)
