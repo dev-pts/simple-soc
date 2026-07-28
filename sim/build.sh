@@ -12,7 +12,7 @@ build() {
 		a.c \
 
 	${CROSS_COMPILE}objcopy -O binary a.out a.bin
-	xxd -e -c 2 a.bin | cut -d ' ' -f 2 > a.hex
+	xxd -e -c 4 a.bin | cut -d ' ' -f 2 > a.hex
 	${CROSS_COMPILE}objdump -M numeric,no-aliases -D a.out > a.lst
 }
 
