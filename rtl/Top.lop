@@ -7,10 +7,19 @@ module: Top
 		uart_out: out
 	submodule:
 		cpu: CPU
-		sram: SimpleSRAM(HEIGHT = 2048)
 		ur: UARTReceiver(UART_CLK_DIV = 50_000_000 / 2_000_000)
 		ut: UARTTransmitter(UART_CLK_DIV = 50_000_000 / 2_000_000)
+		ut_b: BusUARTTransmitter
 		ub: UARTBootloader
+
+		ram: BusSimpleSRAM(HEIGHT = 2048)
+		ram_arbiter: BusArbiter
+		reg_demux: BusDemux(SEL_HI = 12, SEL_LO = 12)
+		cpu_demux: BusDemux(SEL_HI = 31, SEL_LO = 31)
+
+		bus_cpu: BusCPU
+
+		ub_sb: BusSkidBufferReg
 
 	ub.clk = clk
 	ub.reset = reset
@@ -23,25 +32,60 @@ module: Top
 
 	ut.clk = clk
 	ut.reset = ub.cmd.reset
-	ut.data = cpu.mem_wdata
-	ut.valid = |cpu.mem_wmask & cpu.mem_addr[-1] & ~ut.uart_sending
 
-	uart_out = ut.uart_out
+	ut_b.clk = clk
+	ut_b.reset = ub.cmd.reset
 
-	sram.clk = clk
-	if: ub.cmd.wen
-		sram.addr = ub.cmd.addr
-		sram.wen = ub.cmd.wen
-		sram.wdata = ub.cmd.wdata
-		sram.wstrb = -1
-	else:
-		sram.addr = cpu.mem_addr[-1 .. 2]
-		sram.wen = |cpu.mem_wmask & ~cpu.mem_addr[-1]
-		sram.wdata = cpu.mem_wdata
-		sram.wstrb = cpu.mem_wmask
+	$connect(ut.intf, ut_b.ut)
+
+	uart_out = ut.line
 
 	cpu.clk = clk
 	cpu.reset = ub.cmd.reset
 
-	cpu.mem_rdata = sram.rdata
-	cpu.mem_busy = 0
+	bus_cpu.clk = clk
+	bus_cpu.reset = reset
+
+	ram.clk = clk
+	ram.reset = reset
+
+	ram_arbiter.clk = clk
+	ram_arbiter.reset = reset
+
+	reg_demux.clk = clk
+	reg_demux.reset = reset
+
+	reg_demux.desc[0].start = 0
+	reg_demux.desc[0].end = 0xfff
+
+	cpu_demux.clk = clk
+	cpu_demux.reset = reset
+
+	cpu_demux.desc[0].start = 0
+	cpu_demux.desc[0].end = 0x7fff_ffff
+	cpu_demux.desc[1].start = 0x8000_0000
+	cpu_demux.desc[1].end = 0xffff_ffff
+
+	$connect(cpu.mem, bus_cpu.cpu)
+	$connect(cpu_demux.slave, bus_cpu.bus)
+
+	ub_sb.clk = clk
+	ub_sb.reset = reset
+
+	ub_sb.slave.a.addr = ub.cmd.addr
+	ub_sb.slave.a.wen = 1
+	ub_sb.slave.a.len = 0
+	ub_sb.slave.a.valid = ub.cmd.wen
+
+	ub_sb.slave.w.data = ub.cmd.wdata
+	ub_sb.slave.w.strb = -1
+	ub_sb.slave.w.valid = ub.cmd.wen
+
+	$connect(cpu_demux.master[0], ram_arbiter.slave[0])
+	$connect(cpu_demux.master[1], reg_demux.slave)
+
+	$connect(reg_demux.master[0], ut_b.slave)
+
+	$connect(ub_sb.master, ram_arbiter.slave[1])
+
+	$connect(ram_arbiter.master, ram.bus)
