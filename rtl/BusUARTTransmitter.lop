@@ -1,0 +1,15 @@
+module: BusUARTTransmitter:
+		ADDR_WIDTH = 32
+		DATA_BYTES = 4
+	port:
+		clk: in
+		reset: in
+
+		slave: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+		ut: IUARTTransmitter.Master
+
+	ut.data = slave.w.data
+	ut.valid = slave.w.valid & ~ut.busy
+
+	slave.a.ready = 1
+	slave.w.ready = ~ut.busy
