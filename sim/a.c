@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-volatile uint32_t *a = (volatile uint32_t *)0x80000000;
+volatile uint8_t *a = (volatile uint8_t *)0x80000000;
 
 void _start(void)
 {
@@ -8,6 +8,8 @@ void _start(void)
 
 	while (1) {
 		for (const char *ptr = text; *ptr; ptr++) {
+			while (*(a + 1)) {
+			}
 			*a = *ptr;
 		}
 	}

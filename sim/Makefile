@@ -15,7 +15,7 @@ run: a.bin
 	PYTHONPATH=$(dir $(VERI_TEST)) python3 $(TEST) obj_dir/V$(TOP)
 
 a.bin: a.c
-	sh build.sh build
+	sh -xe build.sh build
 
 TopSim.v: king.lop
 	$(LOP_HDL) gen-verilog $(TOP) $^ > TopSim.v

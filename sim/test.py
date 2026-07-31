@@ -35,9 +35,10 @@ def task2(dut):
 		a = np.fromfile(f, dtype='>i4')
 
 	for i in range(len(a)):
-		print(int(i / len(a) * 100))
+		print(int(i / (len(a) - 1) * 100), end='\r')
 		uart.tx(a[i].tobytes())
 		uart.tx(b'\x01')
+	print()
 
 	dut.semaphore()
 

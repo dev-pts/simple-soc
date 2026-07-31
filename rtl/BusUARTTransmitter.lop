@@ -1,15 +1,36 @@
-module: BusUARTTransmitter:
-		ADDR_WIDTH = 32
-		DATA_BYTES = 4
+registers: UARTTransmitterRegs
+	push: 0x0, W
+	full: 0x1, R
+
+module: BusUARTTransmitter
 	port:
 		clk: in
 		reset: in
 
-		slave: IBus.Slave(ADDR_WIDTH = ADDR_WIDTH, DATA_BYTES = DATA_BYTES)
+		slave: IBus.Slave(ADDR_WIDTH = 12, DATA_BYTES = 4)
 		ut: IUARTTransmitter.Master
+	submodule:
+		fifo: FIFO(WIDTH = 8, HEIGHT = 8)
+	regs:
+		regs: UARTTransmitterRegs
 
-	ut.data = slave.w.data
-	ut.valid = slave.w.valid & ~ut.busy
+	fifo.clk = clk
+	fifo.reset = reset
+	fifo.wr.data = slave.w.data
+	fifo.wr.valid = slave.w.valid
+	fifo.rd.ready = ~ut.busy
+
+	ut.data = fifo.rd.data
+	ut.valid = fifo.rd.valid & fifo.rd.ready & ~ut.busy
 
 	slave.a.ready = 1
-	slave.w.ready = ~ut.busy
+	slave.w.ready = fifo.wr.ready
+
+	regs.full = fifo.full
+
+	ff: +clk
+		@slave.header
+
+		@slave.access(regs.full)
+
+		@slave.trailer(reset)

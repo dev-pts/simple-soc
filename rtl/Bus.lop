@@ -75,3 +75,59 @@ interface: IBus:
 			@a.master(addr.master)
 			@w.master(wdata.master)
 			@r.master(rdata.slave)
+
+		hit(reg, offset) = a.addr[-1 .. 2] == ($regaddr(reg)[-1 .. 2] + offset)
+
+		is_write = a.valid & a.ready & a.wen
+		is_read = a.valid & a.ready & ~a.wen
+
+		read(reg) = block:
+			for: i < $regsize(reg) * 8
+				if: @hit(reg, i >> 5)
+					if: $regrmask(reg)[i]
+						r.data[$regaddr(reg)[1 .. 0] * 8 + (i & 0x1f)] = reg[i]
+
+		clear_on_read(reg) = block:
+			if: @hit(reg, 0)
+				if: @is_read
+					for: i < $regsize(reg) * 8
+						if: $regcrmask(reg)[i]
+							reg[i] = 0
+
+		write(reg) = block:
+			if: @hit(reg, 0)
+				if: @is_write
+					for: i
+						if: w.strb[$regaddr(reg)[1 .. 0] + i]
+							for: j < 8
+								if: $regwmask(reg)[i * 8 + j]
+									reg[i * 8 + j] = w.data[($regaddr(reg)[1 .. 0] + i) * 8 + j]
+								if: $regsmask(reg)[i * 8 + j]
+									if: w.data[($regaddr(reg)[1 .. 0] + i) * 8 + j]
+										reg[i * 8 + j] = 1
+
+		clear_on_set(reg) = block:
+			if: @hit(reg, 0)
+				if: @is_write
+					for: i
+						if: w.strb[$regaddr(reg)[1 .. 0] + i]
+							for: j < 8
+								if: $regcsmask(reg)[i * 8 + j]
+									if: w.data[($regaddr(reg)[1 .. 0] + i) * 8 + j]
+										reg[i * 8 + j] = 0
+
+		access(reg) = block:
+			@read(reg)
+			@write(reg)
+			@clear_on_read(reg)
+			@clear_on_set(reg)
+
+		header = block:
+			if: r.valid & r.ready
+				r.valid = 0
+
+		trailer(reset) = block:
+			if: @is_read
+				r.valid = 1
+			if: reset
+				r.valid = 0

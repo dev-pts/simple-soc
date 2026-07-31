@@ -1,4 +1,4 @@
-interface: FIFOPort:
+interface: IFIFO:
 		DATA_WIDTH = 8
 	port: Read / Write
 		data: net[DATA_WIDTH]: out / in
@@ -15,8 +15,8 @@ module: FIFO:
 		clk: in
 		reset: in
 
-		rd: FIFOPort.Read(DATA_WIDTH = WIDTH)
-		wr: FIFOPort.Write(DATA_WIDTH = WIDTH)
+		rd: IFIFO.Read(DATA_WIDTH = WIDTH)
+		wr: IFIFO.Write(DATA_WIDTH = WIDTH)
 
 		half: out
 		empty: out
