@@ -16,8 +16,8 @@ module: BusUARTTransmitter
 
 	fifo.clk = clk
 	fifo.reset = reset
-	fifo.wr.data = slave.w.data
-	fifo.wr.valid = slave.w.valid
+	fifo.wr.data = @slave.writing_data(regs.push)
+	fifo.wr.valid = @slave.is_writing_to(regs.push)
 	fifo.rd.ready = ~ut.busy
 
 	ut.data = fifo.rd.data
