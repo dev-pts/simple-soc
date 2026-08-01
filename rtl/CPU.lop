@@ -6,10 +6,10 @@ interface: ICPU:
 		wdata: net[32]: out / in
 		wmask: net[4]: out / in
 		rstrb: net: out / in
-		busy: net: in / out
+		ready: net: in / out
 	macros:
 		hsdata = { addr, wdata, wmask, rstrb }
-		fulldata = { addr, rdata, wdata, wmask, rstrb, busy }
+		fulldata = { addr, rdata, wdata, wmask, rstrb, ready }
 
 module: CPU:
 		RESET_ADDR = 32x0000_0000
@@ -136,22 +136,23 @@ module: CPU:
 	fsm:
 		state:
 			FETCH_INSTR
-			WAIT_INSTR
 			EXECUTE
 			WAIT_ALU_OR_MEM
 
-	mem.addr = mux(state.WAIT_INSTR | state.FETCH_INSTR, PC, loadstore_addr)
+	ff: +clk
+		mem.addr = mux(state.FETCH_INSTR, PC, loadstore_addr)
 
-	mem.wdata[7 .. 0] = rs2[7 .. 0]
-	mem.wdata[15 .. 8] = mux(loadstore_addr[0], rs2[7 .. 0], rs2[15 .. 8])
-	mem.wdata[23 .. 16] = mux(loadstore_addr[1], rs2[7 .. 0], rs2[23 .. 16])
-	mem.wdata[31 .. 24] = mux(loadstore_addr[0], rs2[7 .. 0], mux(loadstore_addr[1], rs2[15 .. 8], rs2[31 .. 24]))
+		mem.wdata[7 .. 0] = rs2[7 .. 0]
+		mem.wdata[15 .. 8] = mux(loadstore_addr[0], rs2[7 .. 0], rs2[15 .. 8])
+		mem.wdata[23 .. 16] = mux(loadstore_addr[1], rs2[7 .. 0], rs2[23 .. 16])
+		mem.wdata[31 .. 24] = mux(loadstore_addr[0], rs2[7 .. 0], mux(loadstore_addr[1], rs2[15 .. 8], rs2[31 .. 24]))
 
-	mem.rstrb = ((state.EXECUTE | state.WAIT_ALU_OR_MEM) & isLoad) | (state.WAIT_INSTR | state.FETCH_INSTR)
-	mem.wmask = 4{ (state.EXECUTE | state.WAIT_ALU_OR_MEM) & isStore } & STORE_wmask
-	if: reset
-		mem.rstrb = 0
-		mem.wmask = 0
+		mem.rstrb = ((state.EXECUTE | state.WAIT_ALU_OR_MEM) & isLoad) | state.FETCH_INSTR
+		mem.wmask = 4{ (state.EXECUTE | state.WAIT_ALU_OR_MEM) & isStore } & STORE_wmask
+
+		if: reset | mem.ready
+			mem.rstrb = 0
+			mem.wmask = 0
 
 	aluWr = state.EXECUTE & isALU
 
@@ -181,10 +182,7 @@ module: CPU:
 			PC = RESET_ADDR
 		else:
 			if: state.FETCH_INSTR
-				$goto(state.WAIT_INSTR)
-
-			if: state.WAIT_INSTR
-				if: !mem.busy
+				if: mem.ready
 					rs1 = regFile[mem.rdata[19 .. 15]]
 					rs2 = regFile[mem.rdata[24 .. 20]]
 					instr = mem.rdata
@@ -198,7 +196,7 @@ module: CPU:
 					$goto(state.FETCH_INSTR)
 
 			if: state.WAIT_ALU_OR_MEM
-				if: !aluBusy & !mem.busy
+				if: !aluBusy & (~(mem.rstrb | |mem.wmask) | mem.ready)
 					$goto(state.FETCH_INSTR)
 
 	ff: +clk

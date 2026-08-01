@@ -24,7 +24,7 @@ module: BusCPU:
 	bus.r.ready = 1
 
 	cpu.rdata = bus.r.data
-	cpu.busy = (r_busy & ~bus.r.valid) | (w_busy & ~bus.w.ready)
+	cpu.ready = (r_busy & bus.r.valid) | (w_busy & bus.w.ready)
 
 	ff: +clk
 		if: bus.a.valid
