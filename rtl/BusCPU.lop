@@ -9,6 +9,8 @@ module: BusCPU:
 	local:
 		req: net = |cpu.wmask | cpu.rstrb
 		a_done: net
+		r_busy: net
+		w_busy: net
 
 	bus.a.addr = cpu.addr
 	bus.a.wen = |cpu.wmask
@@ -17,19 +19,27 @@ module: BusCPU:
 
 	bus.w.data = cpu.wdata
 	bus.w.strb = cpu.wmask
-	bus.w.valid = |cpu.wmask & ~cpu.rstrb
+	bus.w.valid = |cpu.wmask
 
 	bus.r.ready = 1
 
 	cpu.rdata = bus.r.data
-	cpu.busy = ~((bus.w.valid & bus.w.ready) | (bus.r.valid & bus.r.ready))
+	cpu.busy = (r_busy & ~bus.r.valid) | (w_busy & ~bus.w.ready)
 
 	ff: +clk
-		if: bus.a.valid & bus.a.ready
+		if: bus.a.valid
+			r_busy = ~bus.a.wen
+			w_busy = bus.a.wen
+
+		if: bus.a.ready
 			a_done = 1
 
 		if: (bus.w.valid & bus.w.ready) | (bus.r.valid & bus.r.ready)
 			a_done = 0
+			r_busy = 0
+			w_busy = 0
 
 		if: reset
 			a_done = 0
+			r_busy = 0
+			w_busy = 0

@@ -22,10 +22,10 @@ module: UARTBootloader
 	sr.r_set = 0
 	sr.r_data = 0
 	sr.i_data = ur.data
-	sr.i_valid = ur.valid
+	sr.i_valid = ur.valid & ~cmd.wen
 
 	cnt.clk = clk
-	cnt.r_set = ur.break_cond
+	cnt.r_set = reset
 	cnt.r_data = 1
 	cnt.i_data = cnt.o_data[-1]
 	cnt.i_valid = ur.valid
@@ -41,6 +41,6 @@ module: UARTBootloader
 		if: cmd.wen
 			cmd.addr = cmd.addr + 4
 
-		if: reset | ur.break_cond
+		if: reset
 			cmd.reset = 1
 			cmd.addr = 0

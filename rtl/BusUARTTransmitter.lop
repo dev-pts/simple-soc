@@ -19,6 +19,7 @@ module: BusUARTTransmitter
 	fifo.wr.data = @slave.writing_data(regs.push)
 	fifo.wr.valid = @slave.is_writing_to(regs.push)
 	fifo.rd.ready = ~ut.busy
+	fifo.prio_rd = 0
 
 	ut.data = fifo.rd.data
 	ut.valid = fifo.rd.valid & fifo.rd.ready & ~ut.busy

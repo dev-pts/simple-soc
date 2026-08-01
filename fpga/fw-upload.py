@@ -3,6 +3,8 @@ import numpy as np
 import sys, getopt
 from time import sleep
 
+BAUDRATE = 2_000_000
+
 def do_reset(ser):
 	ser.open()
 
@@ -15,8 +17,8 @@ def do_reset(ser):
 	ser.close()
 
 def do_upload(ser, firmware):
-	ser.baudrate = 2_000_000
 	ser.open()
+	ser.baudrate = BAUDRATE
 
 	with open(firmware, "r") as f:
 		a = np.fromfile(f, dtype='>i4')
@@ -25,12 +27,13 @@ def do_upload(ser, firmware):
 		print('Writing ' + str(i) + ' of ' + str(len(a)))
 		ser.write(a[i].tobytes())
 		ser.write(b'\x01')
+	ser.flush()
 
 	ser.close()
 
 def do_release(ser):
-	ser.baudrate = 2_000_000
 	ser.open()
+	ser.baudrate = BAUDRATE
 
 	ser.write(b'\x00\x00\x00\x00')
 	ser.write(b'\x00')

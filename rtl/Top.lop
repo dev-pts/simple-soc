@@ -1,4 +1,7 @@
 module: Top
+	const:
+		CLK = 50_000_000
+		UART_CLK_DIV = $int(CLK / 2_000_000)
 	port:
 		clk: in
 		reset: in
@@ -7,34 +10,37 @@ module: Top
 		uart_out: out
 	submodule:
 		cpu: CPU
-		ur: UARTReceiver(UART_CLK_DIV = 50_000_000 / 2_000_000)
-		ut: UARTTransmitter(UART_CLK_DIV = 50_000_000 / 2_000_000)
+		bus_cpu: BusCPU
+
+		ur: UARTReceiver(UART_CLK_DIV = UART_CLK_DIV)
+
+		ut: UARTTransmitter(UART_CLK_DIV = UART_CLK_DIV)
 		ut_b: BusUARTTransmitter
+
 		ub: UARTBootloader
+		ub_sb: BusSkidBufferReg
 
 		ram: BusSimpleSRAM(HEIGHT = 2048)
 		ram_arbiter: BusArbiter
 		reg_demux: BusDemux(SEL_HI = 12, SEL_LO = 12)
 		cpu_demux: BusDemux(SEL_HI = 31, SEL_LO = 31)
-
-		bus_cpu: BusCPU
-
-		ub_sb: BusSkidBufferReg
-
-	ub.clk = clk
-	ub.reset = reset
-
-	$connect(ub.ur, ur.intf)
+	local:
+		periph_reset: net = ur.intf.break_cond
 
 	ur.clk = clk
 	ur.reset = reset
 	ur.uart_in = uart_in
 
+	ub.clk = clk
+	ub.reset = periph_reset
+
+	$connect(ub.ur, ur.intf)
+
 	ut.clk = clk
-	ut.reset = ub.cmd.reset
+	ut.reset = periph_reset
 
 	ut_b.clk = clk
-	ut_b.reset = ub.cmd.reset
+	ut_b.reset = periph_reset
 
 	$connect(ut.intf, ut_b.ut)
 
@@ -44,22 +50,22 @@ module: Top
 	cpu.reset = ub.cmd.reset
 
 	bus_cpu.clk = clk
-	bus_cpu.reset = reset
+	bus_cpu.reset = periph_reset
 
 	ram.clk = clk
-	ram.reset = reset
+	ram.reset = periph_reset
 
 	ram_arbiter.clk = clk
-	ram_arbiter.reset = reset
+	ram_arbiter.reset = periph_reset
 
 	reg_demux.clk = clk
-	reg_demux.reset = reset
+	reg_demux.reset = periph_reset
 
 	reg_demux.desc[0].start = 0
 	reg_demux.desc[0].end = 0xfff
 
 	cpu_demux.clk = clk
-	cpu_demux.reset = reset
+	cpu_demux.reset = periph_reset
 
 	cpu_demux.desc[0].start = 0
 	cpu_demux.desc[0].end = 0x7fff_ffff
@@ -67,10 +73,10 @@ module: Top
 	cpu_demux.desc[1].end = 0xffff_ffff
 
 	$connect(cpu.mem, bus_cpu.cpu)
-	$connect(cpu_demux.slave, bus_cpu.bus)
+	$connect(bus_cpu.bus, cpu_demux.slave)
 
 	ub_sb.clk = clk
-	ub_sb.reset = reset
+	ub_sb.reset = periph_reset
 
 	ub_sb.slave.a.addr = ub.cmd.addr
 	ub_sb.slave.a.wen = 1
