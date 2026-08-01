@@ -62,11 +62,8 @@ module: CPU:
 		aluIn1: net[32] = rs1
 		aluIn2: net[32] = mux(isALUreg | isBranch, rs2, Iimm)
 
-		aluReg: net[32]
-		aluShamt: net[5]
-
-		aluBusy: net = |aluShamt
-		aluWr: net
+		aluBusy: net = 0
+		aluWr: net = state.EXECUTE & isALU
 
 		aluPlus: net[32] = aluIn1 + aluIn2
 
@@ -75,17 +72,16 @@ module: CPU:
 		LTU: net = aluMinus[32]
 		EQ: net = aluMinus[31 .. 0] == 0
 
-		funct3IsShift: net = funct3Is[1] | funct3Is[5]
-
 		\\ muxes are better than ANDing manually, shows gowin
 		aluOut: net[32] = \
 			mux(funct3Is[0], mux(instr[30] & instr[5], aluMinus[31 .. 0], aluPlus), 32b0) | \
+			mux(funct3Is[1], leftShift, 32b0) | \
 			mux(funct3Is[2], { 31b0, LT }, 32b0) | \
 			mux(funct3Is[3], { 31b0, LTU }, 32b0) | \
 			mux(funct3Is[4], aluIn1 ^ aluIn2, 32b0) | \
+			mux(funct3Is[5], shifter, 32b0) | \
 			mux(funct3Is[6], aluIn1 | aluIn2, 32b0) | \
-			mux(funct3Is[7], aluIn1 & aluIn2, 32b0) | \
-			mux(funct3IsShift, aluReg, 32b0)
+			mux(funct3Is[7], aluIn1 & aluIn2, 32b0)
 
 		predicate: net = \
 			funct3Is[0] & EQ | \
@@ -130,9 +126,13 @@ module: CPU:
 		writeBack: net = ~(isBranch | isStore) & (state.EXECUTE | state.WAIT_ALU_OR_MEM)
 
 		jumpToPCplusImm: net = isJAL | (isBranch & predicate)
-		needToWait: net = isLoad | isStore | isALU & funct3IsShift
+		needToWait: net = isLoad | isStore
 
 		cycles: net[32]
+
+		shifter_in: net[32] = mux(funct3Is[1], for(i, aluIn1[i]), aluIn1)
+		shifter: net[32] = $signed({ instr[30] & aluIn1[31], shifter_in }) >>> aluIn2[4 .. 0]
+		leftShift: net[32] = for(i, shifter[i])
 	fsm:
 		state:
 			FETCH_INSTR
@@ -154,27 +154,10 @@ module: CPU:
 			mem.rstrb = 0
 			mem.wmask = 0
 
-	aluWr = state.EXECUTE & isALU
-
 	ff: +clk
 		if: writeBack
 			if: rdId != 0
 				regFile[rdId] = writeBackData
-
-	ff: +clk
-		if: aluWr
-			if: funct3IsShift
-				aluReg = aluIn1
-				aluShamt = aluIn2[4 .. 0]
-
-		if: |aluShamt
-			aluShamt = aluShamt - 1
-
-			\\ Compact form of:
-			\\ funct3=001 -> SLL (aluReg <= aluReg << 1)
-			\\ funct3=101 & instr[30] -> SRA (aluReg <= {aluReg[31], aluReg[31:1]})
-			\\ funct3=101 & !instr[30] -> SRL (aluReg <= {1'b0, aluReg[31:1]})
-			aluReg = mux(funct3Is[1], aluReg << 1, { instr[30] & aluReg[31], aluReg[31 .. 1] })
 
 	ff: +clk
 		if: reset
