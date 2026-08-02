@@ -2,7 +2,7 @@
 
 build() {
 	${CROSS_COMPILE}gcc \
-		-march=rv32i -mabi=ilp32 \
+		-march=rv32im -mabi=ilp32 \
 		-nostdlib -fno-PIC -ffreestanding \
 		-Xlinker --gc-sections \
 		-Xlinker -Ttext=0 \

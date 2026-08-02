@@ -62,7 +62,7 @@ module: CPU:
 		aluIn1: net[32] = rs1
 		aluIn2: net[32] = mux(isALUreg | isBranch, rs2, Iimm)
 
-		aluBusy: net = 0
+		aluBusy: net = |quotient_msk
 		aluWr: net = state.EXECUTE & isALU
 
 		aluPlus: net[32] = aluIn1 + aluIn2
@@ -74,14 +74,19 @@ module: CPU:
 
 		\\ muxes are better than ANDing manually, shows gowin
 		aluOut: net[32] = \
-			mux(funct3Is[0], mux(instr[30] & instr[5], aluMinus[31 .. 0], aluPlus), 32b0) | \
-			mux(funct3Is[1], leftShift, 32b0) | \
-			mux(funct3Is[2], { 31b0, LT }, 32b0) | \
-			mux(funct3Is[3], { 31b0, LTU }, 32b0) | \
-			mux(funct3Is[4], aluIn1 ^ aluIn2, 32b0) | \
-			mux(funct3Is[5], shifter, 32b0) | \
-			mux(funct3Is[6], aluIn1 | aluIn2, 32b0) | \
-			mux(funct3Is[7], aluIn1 & aluIn2, 32b0)
+			mux(isALUreg & funcM,
+				mux(funct3Is[0], multiply[31 .. 0], 32b0) | \
+				mux(|funct3Is[3 .. 1], multiply[63 .. 32], 32b0) | \
+				mux(instr[14], mux(div_sign, -divResult, divResult), 32b0),
+				mux(funct3Is[0], mux(instr[30] & instr[5], aluMinus[31 .. 0], aluPlus), 32b0) | \
+				mux(funct3Is[1], leftShift, 32b0) | \
+				mux(funct3Is[2], { 31b0, LT }, 32b0) | \
+				mux(funct3Is[3], { 31b0, LTU }, 32b0) | \
+				mux(funct3Is[4], aluIn1 ^ aluIn2, 32b0) | \
+				mux(funct3Is[5], shifter, 32b0) | \
+				mux(funct3Is[6], aluIn1 | aluIn2, 32b0) | \
+				mux(funct3Is[7], aluIn1 & aluIn2, 32b0)
+			)
 
 		predicate: net = \
 			funct3Is[0] & EQ | \
@@ -126,18 +131,54 @@ module: CPU:
 		writeBack: net = ~(isBranch | isStore) & (state.EXECUTE | state.WAIT_ALU_OR_MEM)
 
 		jumpToPCplusImm: net = isJAL | (isBranch & predicate)
-		needToWait: net = isLoad | isStore
+		needToWait: net = isLoad | isStore | isDivide
 
 		cycles: net[32]
 
 		shifter_in: net[32] = mux(funct3Is[1], for(i, aluIn1[i]), aluIn1)
 		shifter: net[32] = $signed({ instr[30] & aluIn1[31], shifter_in }) >>> aluIn2[4 .. 0]
 		leftShift: net[32] = for(i, shifter[i])
+
+		funcM: net = instr[25]
+		isMULH: net = funct3Is[1]
+		isMULHSU: net = funct3Is[2]
+
+		sign1: net = aluIn1[31] & isMULH
+		sign2: net = aluIn2[31] & (isMULH | isMULHSU)
+
+		signed1: net[33] = { sign1, aluIn1 }
+		signed2: net[33] = { sign2, aluIn2 }
+		multiply: net[64] = $signed(signed1) * $signed(signed2)
+
+		isDivide: net = isALUreg & funcM & instr[14]
+		dividend: net[32]
+		divisor: net[63]
+		quotient: net[32]
+		quotient_msk: net[32]
+		divstep_do: net = divisor <= { 31b0, dividend }
+		dividendN: net[32] = mux(divstep_do, dividend - divisor[31 .. 0], dividend)
+		quotientN: net[32] = mux(divstep_do, quotient | quotient_msk, quotient)
+		div_sign: net = ~instr[12] & mux(instr[13], aluIn1[31], (aluIn1[31] != aluIn2[31]) & |aluIn2)
+		divResult: net[32]
 	fsm:
 		state:
 			FETCH_INSTR
 			EXECUTE
 			WAIT_ALU_OR_MEM
+
+	ff: +clk
+		if: isDivide & aluWr
+			dividend = mux(~instr[12] & aluIn1[31], -aluIn1, aluIn1)
+			divisor = { mux(~instr[12] & aluIn2[31], -aluIn2, aluIn2), 31b0 }
+			quotient = 0
+			quotient_msk = 1 << 31
+		else:
+			dividend = dividendN
+			divisor = divisor >> 1
+			quotient = quotientN
+			quotient_msk = quotient_msk >> 1
+
+		divResult = mux(instr[13], dividendN, quotientN)
 
 	ff: +clk
 		mem.addr = mux(state.FETCH_INSTR, PC, loadstore_addr)
