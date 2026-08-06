@@ -4,6 +4,7 @@ GEN_TB_H ?= sh gen-tb-h.sh
 TEST ?= test.py
 VERI_TEST ?= VeryTest.py
 CLK ?= 
+FWBIN ?= a.bin
 
 tb: $(TB_CPP) TopSim.v
 	$(VERILATOR) --trace-underscore --no-timing --x-initial-edge --cc --trace -Wno-lint --exe --build -O3 --x-assign fast --x-initial fast --noassert -Wno-fatal -Wno-unoptflat --top $(TOP) \
@@ -11,8 +12,8 @@ tb: $(TB_CPP) TopSim.v
 		--build-jobs $(shell nproc) \
 		$^
 
-run: a.bin
-	PYTHONPATH=$(dir $(VERI_TEST)) python3 $(TEST) obj_dir/V$(TOP)
+run:
+	PYTHONPATH=$(dir $(VERI_TEST)) python3 $(TEST) obj_dir/V$(TOP) simx.vcd $(FWBIN)
 
 a.bin: a.c
 	sh -xe build.sh build

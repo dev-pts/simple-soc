@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 
 import VeriTest
 import tb
@@ -15,7 +16,7 @@ def task1(dut):
 	dut.semaphore()
 
 	dut.dump(True)
-	dut.wait(200000)
+	dut.wait(1000000)
 	dut.finish()
 
 def task2(dut):
@@ -31,7 +32,7 @@ def task2(dut):
 	# Assert reset
 	uart.break_cond()
 
-	with open('a.bin', 'r') as f:
+	with open(sys.argv[3], 'r') as f:
 		a = np.fromfile(f, dtype='>i4')
 
 	for i in range(len(a)):
@@ -46,7 +47,7 @@ def task2(dut):
 	uart.tx(b'\x00\x00\x00\x00')
 	uart.tx(b'\x00')
 
-vt = VeriTest.VeriTest(tb.ports, 'simx.vcd')
+vt = VeriTest.VeriTest(sys.argv[1], tb.ports, sys.argv[2])
 vt.add(task1)
 vt.add(task2)
 vt.run()

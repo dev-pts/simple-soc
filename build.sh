@@ -13,6 +13,10 @@ clean() {
 	make clean
 	cd -
 
+	cd fw/src
+	make clean
+	cd -
+
 	cd sim/
 	make clean
 	cd -
@@ -32,6 +36,15 @@ build() {
 		LOP_HDL="python3 ../tools/lop-hdl/main.py" \
 		TOP=Top
 	cd -
+
+	cd fw/src
+	make
+	cd -
+
+	cd sim/
+	make a.bin \
+		CROSS_COMPILE=${HOME}/opt/cross/bin/riscv-elf-
+	cd -
 }
 
 run() {
@@ -49,9 +62,9 @@ run() {
 
 	make run \
 		VERI_TEST=$(pwd)/../tools/veri-test/VeriTest.py \
-		CROSS_COMPILE=${HOME}/opt/cross/bin/riscv-elf- \
 		TEST=$1 \
-		TOP=$2
+		TOP=$2 \
+		FWBIN=$4
 
 	cd -
 }

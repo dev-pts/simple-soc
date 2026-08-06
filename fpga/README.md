@@ -12,3 +12,8 @@ To upload bitstream, git clone openFPGALoader, build and then:
 ```
 ./openFPGALoader -b tangprimer25k fpga_project.fs
 ```
+
+To upload the fw:
+```
+python3 fpga/fw-upload.py -d /dev/ttyUSB1 -f fw/src/build/fw.bin
+```

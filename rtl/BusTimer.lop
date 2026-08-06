@@ -1,5 +1,5 @@
 registers: TimerRegs
-	counter: 0x3 .. 0x0, R
+	counter: 0x1 .. 0x0, R
 
 module: BusTimer:
 		CLK = 1_000_000
@@ -15,7 +15,7 @@ module: BusTimer:
 		regs: TimerRegs
 	local:
 		counter: net[$clog2(CMP)]
-		counter_next: net[32] = counter - 1
+		counter_next: net[$clog2(CMP)] = counter - 1
 
 	slave.a.ready = 1
 	slave.w.ready = 1
