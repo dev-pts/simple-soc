@@ -99,7 +99,7 @@ module: CPU:
 		loadstore_addr: net[32] = rs1 + mux(isStore, Simm, Iimm)
 
 		writeBackData: net[32] = \
-			mux(isSYSTEM, cycles, 32b0) | \
+			mux(isSYSTEM, 0, 32b0) | \
 			mux(isLUI, Uimm, 32b0) | \
 			mux(isALU, aluOut, 32b0) | \
 			mux(isAUIPC, PCplusImm, 32b0) | \
@@ -132,8 +132,6 @@ module: CPU:
 
 		jumpToPCplusImm: net = isJAL | (isBranch & predicate)
 		needToWait: net = isLoad | isStore | isDivide
-
-		cycles: net[32]
 
 		shifter_in: net[32] = mux(funct3Is[1], for(i, aluIn1[i]), aluIn1)
 		shifter: net[32] = $signed({ instr[30] & aluIn1[31], shifter_in }) >>> aluIn2[4 .. 0]
@@ -222,6 +220,3 @@ module: CPU:
 			if: state.WAIT_ALU_OR_MEM
 				if: !aluBusy & (~(mem.rstrb | |mem.wmask) | mem.ready)
 					$goto(state.FETCH_INSTR)
-
-	ff: +clk
-		cycles = cycles + 1
