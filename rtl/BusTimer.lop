@@ -1,0 +1,39 @@
+registers: TimerRegs
+	counter: 0x3 .. 0x0, R
+
+module: BusTimer:
+		CLK = 1_000_000
+		TICK = 1_000
+	const:
+		CMP = $int(CLK / TICK)
+	port:
+		clk: in
+		reset: in
+
+		slave: IBus.Slave(ADDR_WIDTH = 12, DATA_BYTES = 4)
+	regs:
+		regs: TimerRegs
+	local:
+		counter: net[$clog2(CMP)]
+		counter_next: net[32] = counter - 1
+
+	slave.a.ready = 1
+	slave.w.ready = 1
+
+	ff: +clk
+		@slave.header
+
+		@slave.access(regs.counter)
+
+		@slave.trailer(reset)
+
+		counter = counter_next
+		if: counter_next == 0
+			regs.counter = regs.counter + 1
+			counter = CMP
+
+		if: reset
+			counter = CMP
+
+		if: reset | @slave.is_reading_from(regs.counter)
+			regs.counter = 0

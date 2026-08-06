@@ -20,10 +20,12 @@ module: Top
 		ub: UARTBootloader
 		ub_sb: BusSkidBufferReg
 
-		ram: BusSimpleSRAM(HEIGHT = 2048)
+		ram: BusSimpleSRAM(HEIGHT = 4096)
 		ram_arbiter: BusArbiter
 		reg_demux: BusDemux(SEL_HI = 12, SEL_LO = 12)
 		cpu_demux: BusDemux(SEL_HI = 31, SEL_LO = 31)
+
+		timer_b: BusTimer(CLK = CLK, TICK = 10_000)
 	local:
 		periph_reset: net = ur.intf.break_cond
 
@@ -46,6 +48,9 @@ module: Top
 
 	uart_out = ut.line
 
+	timer_b.clk = clk
+	timer_b.reset = periph_reset
+
 	cpu.clk = clk
 	cpu.reset = ub.cmd.reset
 
@@ -63,6 +68,8 @@ module: Top
 
 	reg_demux.desc[0].start = 0
 	reg_demux.desc[0].end = 0xfff
+	reg_demux.desc[1].start = 0x1000
+	reg_demux.desc[1].end = 0x1fff
 
 	cpu_demux.clk = clk
 	cpu_demux.reset = periph_reset
@@ -91,6 +98,7 @@ module: Top
 	$connect(cpu_demux.master[1], reg_demux.slave)
 
 	$connect(reg_demux.master[0], ut_b.slave)
+	$connect(reg_demux.master[1], timer_b.slave)
 
 	$connect(ub_sb.master, ram_arbiter.slave[1])
 
