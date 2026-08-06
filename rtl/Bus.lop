@@ -133,5 +133,6 @@ interface: IBus:
 				r.valid = 0
 
 		is_writing_to(reg) = @is_write && @hit(reg, 0) && |w.strb[$regaddr(reg)[1 .. 0] +.. 1]
+		is_reading_from(reg) = @is_read && @hit(reg, 0)
 
 		writing_data(reg) = w.data[$regaddr(reg)[1 .. 0] * 8 +.. 8]
