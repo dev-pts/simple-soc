@@ -123,6 +123,7 @@ interface: IBus:
 			@clear_on_set(reg)
 
 		header = block:
+			r.data = 0
 			if: r.valid & r.ready
 				r.valid = 0
 
