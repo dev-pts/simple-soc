@@ -7,3 +7,6 @@
 [submodule "tools/veri-test"]
 	path = tools/veri-test
 	url = https://github.com/dev-pts/veri-test
+[submodule "fw/FreeRTOS-Kernel"]
+	path = fw/FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel
